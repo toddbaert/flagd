@@ -10,9 +10,10 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
+	"github.com/open-feature/flagd/pkg/model"
+	"github.com/open-feature/flagd/pkg/provider"
 	"github.com/open-feature/flagd/pkg/runtime"
 	"github.com/open-feature/flagd/pkg/service"
-	"github.com/open-feature/flagd/pkg/sync"
 	"github.com/spf13/cobra"
 )
 
@@ -31,11 +32,6 @@ func findService(name string) (service.IService, error) {
 				Port: int32(httpServicePort),
 			},
 		},
-		"socket": &service.SocketService{
-			SocketServiceConfiguration: &service.SocketServiceConfiguration{
-				SocketPath: socketServicePath,
-			},
-		},
 	}
 	if v, ok := registeredServices[name]; !ok {
 		return nil, errors.New("no service-provider set")
@@ -45,10 +41,11 @@ func findService(name string) (service.IService, error) {
 	}
 }
 
-func findSync(name string) (sync.ISync, error) {
-	registeredSync := map[string]sync.ISync{
-		"filepath": &sync.FilePathSync{
+func findProvider(name string) (provider.IProvider, error) {
+	registeredSync := map[string]provider.IProvider{
+		"filepath": &provider.FilePathProvider{
 			URI: uri,
+			Flags: model.Flags{},
 		},
 	}
 	if v, ok := registeredSync[name]; !ok {
@@ -66,19 +63,20 @@ var startCmd = &cobra.Command{
 	Long:  ``,
 	Run: func(cmd *cobra.Command, args []string) {
 
+		// Configure provider impl--------------------------------------------
+		var providerImpl provider.IProvider
+		if foundSync, err := findProvider(syncProvider); err != nil {
+			return
+		} else {
+			providerImpl = foundSync
+		}
+
 		// Configure service-provider impl------------------------------------------
 		var serviceImpl service.IService
 		if foundService, err := findService(serviceProvider); err != nil {
 			return
 		} else {
 			serviceImpl = foundService
-		}
-		// Configure sync-provider impl--------------------------------------------
-		var syncImpl sync.ISync
-		if foundSync, err := findSync(syncProvider); err != nil {
-			return
-		} else {
-			syncImpl = foundSync
 		}
 
 		// Serve ------------------------------------------------------------------
@@ -92,7 +90,7 @@ var startCmd = &cobra.Command{
 			}()
 		}()
 
-		go runtime.Start(syncImpl, serviceImpl, ctx)
+		go runtime.Start(serviceImpl, providerImpl, ctx)
 
 		err := <-errc
 		if err != nil {

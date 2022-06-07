@@ -1,0 +1,6 @@
+output: ./pkg/generated/flag_definitions.gen.go
+package: gen
+generate:
+  models: true
+output-options:
+  skip-prune: true

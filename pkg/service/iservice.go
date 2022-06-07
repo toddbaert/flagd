@@ -1,5 +1,7 @@
 package service
 
+import "github.com/open-feature/flagd/pkg/provider"
+
 type IServiceConfiguration interface {
 }
 
@@ -19,5 +21,5 @@ type IServiceResponse interface {
 }
 
 type IService interface {
-	Serve(handlerFunc func(IServiceRequest) IServiceResponse) error
+	Serve(provider provider.IProvider) error
 }

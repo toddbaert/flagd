@@ -2,7 +2,7 @@ IMG=flagd:latest
 PHONY: .docker-build .build .run
 PREFIX=/usr/local
 generate:
-	${GOPATH}/bin/oapi-codegen --config=./open_api_gen_config.yml ./openapi/provider.yml
+	${GOPATH}/bin/oapi-codegen --config=./open_api_gen_config.yml ./schemas/openapi/provider.yml
 docker-build:
 	docker buildx build --platform="linux/amd64,linux/arm64" -t ${IMG} .
 build: generate
