@@ -9,6 +9,7 @@ import (
 
 	"github.com/open-feature/flagd/pkg/eval"
 	gen "github.com/open-feature/flagd/pkg/generated"
+	"github.com/open-feature/flagd/pkg/model"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -26,21 +27,15 @@ type Server struct {
 
 // implement the generated ServerInterface.
 // TODO: might be able to simplify some of this with generics.
-// TODO: add improved, more RESTful error handling, we should inspect
-// the returned ErrorCode and respond with a matching HTTP status code.
-func (s Server) ResolveBoolean(
-	w http.ResponseWriter, r *http.Request, flagKey gen.FlagKey, params gen.ResolveBooleanParams,
-) {
-	result, reason, err := s.eval.ResolveBooleanValue(flagKey, params.DefaultValue)
-	if err != nil {
-		message := err.Error()
-		log.Error(message)
-		w.WriteHeader(500)
-		_ = json.NewEncoder(w).Encode(gen.ResolutionDetailsWithError{
-			ErrorCode: &message,
-			Reason:    &reason,
-		})
-		return
+func (s Server) ResolveBoolean(w http.ResponseWriter, r *http.Request, flagKey gen.FlagKey, params gen.ResolveBooleanParams) {
+
+	var contextObj gen.Context
+	json.NewDecoder(r.Body).Decode(&contextObj)
+
+	result, reason, err := s.eval.ResolveBooleanValue(flagKey, params.DefaultValue, contextObj)
+	if (err != nil) {
+		handleError(err, reason, w);
+		return;
 	}
 	_ = json.NewEncoder(w).Encode(gen.ResolutionDetailsBoolean{
 		Value:  result,
@@ -48,19 +43,15 @@ func (s Server) ResolveBoolean(
 	})
 }
 
-func (s Server) ResolveString(
-	w http.ResponseWriter, r *http.Request, flagKey gen.FlagKey, params gen.ResolveStringParams,
-) {
-	result, reason, err := s.eval.ResolveStringValue(flagKey, params.DefaultValue)
-	if err != nil {
-		message := err.Error()
-		log.Error(message)
-		w.WriteHeader(500)
-		_ = json.NewEncoder(w).Encode(gen.ResolutionDetailsWithError{
-			ErrorCode: &message,
-			Reason:    &reason,
-		})
-		return
+func (s Server) ResolveString(w http.ResponseWriter, r *http.Request, flagKey gen.FlagKey, params gen.ResolveStringParams) {
+
+	var contextObj gen.Context
+	json.NewDecoder(r.Body).Decode(&contextObj)
+
+	result, reason, err := s.eval.ResolveStringValue(flagKey, params.DefaultValue, contextObj)
+	if (err != nil) {
+		handleError(err, reason, w);
+		return;
 	}
 	_ = json.NewEncoder(w).Encode(gen.ResolutionDetailsString{
 		Value:  result,
@@ -68,19 +59,15 @@ func (s Server) ResolveString(
 	})
 }
 
-func (s Server) ResolveNumber(
-	w http.ResponseWriter, r *http.Request, flagKey gen.FlagKey, params gen.ResolveNumberParams,
-) {
-	result, reason, err := s.eval.ResolveNumberValue(flagKey, params.DefaultValue)
-	if err != nil {
-		message := err.Error()
-		log.Error(message)
-		w.WriteHeader(500)
-		_ = json.NewEncoder(w).Encode(gen.ResolutionDetailsWithError{
-			ErrorCode: &message,
-			Reason:    &reason,
-		})
-		return
+func (s Server) ResolveNumber(w http.ResponseWriter, r *http.Request, flagKey gen.FlagKey, params gen.ResolveNumberParams) {
+
+	var contextObj gen.Context
+	json.NewDecoder(r.Body).Decode(&contextObj)
+
+	result, reason, err := s.eval.ResolveNumberValue(flagKey, params.DefaultValue, contextObj)
+	if (err != nil) {
+		handleError(err, reason, w);
+		return;
 	}
 	_ = json.NewEncoder(w).Encode(gen.ResolutionDetailsNumber{
 		Value:  result,
@@ -88,19 +75,15 @@ func (s Server) ResolveNumber(
 	})
 }
 
-func (s Server) ResolveObject(
-	w http.ResponseWriter, r *http.Request, flagKey gen.FlagKey, params gen.ResolveObjectParams,
-) {
-	result, reason, err := s.eval.ResolveObjectValue(flagKey, params.DefaultValue.AdditionalProperties)
-	if err != nil {
-		message := err.Error()
-		log.Error(message)
-		w.WriteHeader(500)
-		_ = json.NewEncoder(w).Encode(gen.ResolutionDetailsWithError{
-			ErrorCode: &message,
-			Reason:    &reason,
-		})
-		return
+func (s Server) ResolveObject(w http.ResponseWriter, r *http.Request, flagKey gen.FlagKey, params gen.ResolveObjectParams) {
+
+	var contextObj gen.Context
+	json.NewDecoder(r.Body).Decode(&contextObj)
+
+	result, reason, err := s.eval.ResolveObjectValue(flagKey, params.DefaultValue.AdditionalProperties, contextObj)
+	if (err != nil) {
+		handleError(err, reason, w);
+		return;
 	}
 	_ = json.NewEncoder(w).Encode(gen.ResolutionDetailsObject{
 		Value: gen.ResolutionDetailsObject_Value{
@@ -119,4 +102,22 @@ func (h *HTTPService) Serve(ctx context.Context, eval eval.IEvaluator) error {
 
 	<-ctx.Done()
 	return nil
+}
+
+// some basic mapping of errors from model to HTTP
+func handleError(err error, reason string, w http.ResponseWriter) {
+	message := err.Error();
+	switch message {
+		case model.FlagNotFoundErrorCode:
+			w.WriteHeader(404)
+		case model.TypeMismatchErrorCode:
+			w.WriteHeader(400)
+		default:
+			w.WriteHeader(500)
+	}
+	log.Error(message)
+	json.NewEncoder(w).Encode(gen.ResolutionDetailsWithError{
+		ErrorCode: &message,
+		Reason: &reason,
+	})
 }
