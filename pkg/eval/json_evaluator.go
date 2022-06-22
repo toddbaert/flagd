@@ -44,6 +44,8 @@ func (je *JSONEvaluator) SetState(state string) error {
 		log.Error(err)
 		return err
 	}
+
+	// this can't fail if the gojsonschema.Validate succeeded
 	_ = json.Unmarshal([]byte(state), &je.state)
 	return nil
 }
