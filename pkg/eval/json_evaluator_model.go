@@ -13,5 +13,5 @@ type Flag struct {
 	State 					string									`json:"state"`
 	DefaultVariant	string									`json:"defaultVariant"`
 	Variants 				map[string]interface{}	`json:"variants"`
-	Rules 					json.RawMessage					`json:"rules"`
+	Targeting				json.RawMessage					`json:"targeting"`
 }

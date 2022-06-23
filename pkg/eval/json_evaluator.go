@@ -135,10 +135,12 @@ func (je *JSONEvaluator) evaluateVariant (flagKey string, context gen.Context) (
 		// flag not found
 		return "", model.ErrorReason, errors.New(model.FlagNotFoundErrorCode)
 	}
-	rules := flag.Rules
+
+	// get the targeting logic, if any
+	targeting := flag.Targeting
 	
-	if rules != nil {
-		rulesBytes, err := rules.MarshalJSON()
+	if targeting != nil {
+		targetingBytes, err := targeting.MarshalJSON()
 		if err != nil {
 			log.Errorf("Error parsing rules for flag %s, %s", flagKey, err)
 			return "", model.ErrorReason, err
@@ -152,7 +154,7 @@ func (je *JSONEvaluator) evaluateVariant (flagKey string, context gen.Context) (
 		var result bytes.Buffer
 		
 		// evaluate json-logic rules to determine the variant
-		err = jsonlogic.Apply(bytes.NewReader(rulesBytes), bytes.NewReader(contextBytes), &result)
+		err = jsonlogic.Apply(bytes.NewReader(targetingBytes), bytes.NewReader(contextBytes), &result)
 		if err != nil {
 			log.Errorf("Error applying rules %s", err)
 			return "", model.ErrorReason, err

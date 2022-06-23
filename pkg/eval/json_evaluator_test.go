@@ -93,7 +93,7 @@ StaticNumberValue,
 StaticObjectFlag,
 StaticObjectValue)
 
-const DynamicFlag = "ruleFlag";
+const DynamicFlag = "targetingFlag";
 const ColorProp = "color";
 const ColorValue = "yellow";
 var DynamicFlags = fmt.Sprintf( `{
@@ -105,7 +105,7 @@ var DynamicFlags = fmt.Sprintf( `{
         "off": false
       },
       "defaultVariant": "off",
-			"rules": {
+			"targeting": {
         "if": [
           {
             "==": [
@@ -295,7 +295,7 @@ func TestResolveObjectValue_NotObject_Error(t *testing.T) {
 	assert.EqualError(t, err, model.TypeMismatchErrorCode)
 }
 
-func TestResolveXxxValue_RuleResolvesVariant_DynamicValue(t *testing.T) {
+func TestResolveXxxValue_TargetingResolvesVariant_DynamicValue(t *testing.T) {
 	evaluator := JsonEvaluator{}
 
 	// set state with an static flag definition
@@ -314,7 +314,7 @@ func TestResolveXxxValue_RuleResolvesVariant_DynamicValue(t *testing.T) {
 	}
 }
 
-func TestResolveXxxValue_RuleResolvesNonVariant_StaticValue(t *testing.T) {
+func TestResolveXxxValue_TargetingResolvesNonVariant_StaticValue(t *testing.T) {
 	evaluator := JsonEvaluator{}
 
 	// set state with an static flag definition
@@ -325,7 +325,7 @@ func TestResolveXxxValue_RuleResolvesNonVariant_StaticValue(t *testing.T) {
 
 	// evaluate the dynamic flag, this should return null, and therefor reasons should be STATIC
 	val, reason, err := evaluator.ResolveBooleanValue(DynamicFlag, false, gen.Context{ AdditionalProperties: map[string]interface{}{
-		ColorProp: "red", // not the expected value for the rule to match
+		ColorProp: "red", // not the expected value for the targeting to match
 		} })
 	if assert.NoError(t, err) {
 		assert.False(t, val)

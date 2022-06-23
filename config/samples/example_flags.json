@@ -43,7 +43,7 @@
         "off": false
       },
       "defaultVariant": "off",
-      "rules": {
+      "targeting": {
         "if": [
           {
             "==": [
