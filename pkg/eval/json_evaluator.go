@@ -36,7 +36,7 @@ func (je *JSONEvaluator) SetState(state string) error {
 	result, err := gojsonschema.Validate(schemaLoader, flagStringLoader)
 
 	// TODO: we can add validation for all rules by calling jsonlogic.IsValid() on each
-	
+
 	if err != nil {
 		return err
 	} else if !result.Valid() {
@@ -51,57 +51,57 @@ func (je *JSONEvaluator) SetState(state string) error {
 }
 
 // TODO: might be able to simplify some of this with generics.
-func (je *JSONEvaluator) ResolveBooleanValue (flagKey string, defaultValue bool, context gen.Context) (
+func (je *JSONEvaluator) ResolveBooleanValue(flagKey string, defaultValue bool, context gen.Context) (
 	value bool,
 	reason string,
-	err error) {
-
+	err error,
+) {
 	variant, reason, err := je.evaluateVariant(flagKey, context)
 	if err != nil {
 		log.Errorf("Error evaluating flag, %s", err.Error())
 		return defaultValue, reason, err
 	}
 
-	val, ok := je.state.Flags[flagKey].Variants[variant].(bool);
-	if (!ok) {
+	val, ok := je.state.Flags[flagKey].Variants[variant].(bool)
+	if !ok {
 		log.Errorf("Error converting %s to bool", flagKey)
 		return defaultValue, model.ErrorReason, errors.New(model.TypeMismatchErrorCode)
 	}
 	return val, reason, nil
 }
 
-func (je *JSONEvaluator) ResolveStringValue (flagKey string, defaultValue string, context gen.Context) (
+func (je *JSONEvaluator) ResolveStringValue(flagKey string, defaultValue string, context gen.Context) (
 	value string,
 	reason string,
-	err error) {
-
+	err error,
+) {
 	variant, reason, err := je.evaluateVariant(flagKey, context)
 	if err != nil {
 		log.Errorf("Error evaluating flag, %s", err.Error())
 		return defaultValue, reason, err
 	}
-	
-	val, ok := je.state.Flags[flagKey].Variants[variant].(string);
-	if (!ok) {
+
+	val, ok := je.state.Flags[flagKey].Variants[variant].(string)
+	if !ok {
 		log.Errorf("Error converting %s to string", flagKey)
 		return defaultValue, model.ErrorReason, errors.New(model.TypeMismatchErrorCode)
 	}
 	return val, model.StaticReason, nil
 }
 
-func (je *JSONEvaluator) ResolveNumberValue (flagKey string, defaultValue float32, context gen.Context) (
+func (je *JSONEvaluator) ResolveNumberValue(flagKey string, defaultValue float32, context gen.Context) (
 	value float32,
 	reason string,
-	err error) {
-
+	err error,
+) {
 	variant, reason, err := je.evaluateVariant(flagKey, context)
 	if err != nil {
 		log.Errorf("Error evaluating flag, %s", err.Error())
 		return defaultValue, reason, err
 	}
-	
-	val, ok := je.state.Flags[flagKey].Variants[variant].(float64);
-	if (!ok) {
+
+	val, ok := je.state.Flags[flagKey].Variants[variant].(float64)
+	if !ok {
 		log.Errorf("Error converting %s to float32", flagKey)
 		return defaultValue, model.ErrorReason, errors.New(model.TypeMismatchErrorCode)
 	}
@@ -111,16 +111,16 @@ func (je *JSONEvaluator) ResolveNumberValue (flagKey string, defaultValue float3
 func (je *JSONEvaluator) ResolveObjectValue(flagKey string, defaultValue map[string]interface{}, context gen.Context) (
 	value map[string]interface{},
 	reason string,
-	err error) {
-
+	err error,
+) {
 	variant, reason, err := je.evaluateVariant(flagKey, context)
 	if err != nil {
 		log.Errorf("Error evaluating flag, %s", err.Error())
 		return defaultValue, reason, err
 	}
-	
-	val, ok := je.state.Flags[flagKey].Variants[variant].(map[string]interface{});
-	if (!ok) {
+
+	val, ok := je.state.Flags[flagKey].Variants[variant].(map[string]interface{})
+	if !ok {
 		log.Errorf(fmt.Sprintf("Error converting %s to object", flagKey))
 		return defaultValue, model.ErrorReason, errors.New(model.TypeMismatchErrorCode)
 	}
@@ -128,9 +128,11 @@ func (je *JSONEvaluator) ResolveObjectValue(flagKey string, defaultValue map[str
 }
 
 // runs the rules (if defined) to determine the variant, otherwise falling through to the default
-func (je *JSONEvaluator) evaluateVariant (flagKey string, context gen.Context) (variant string, reason string, err error) {
-
-	flag, ok := je.state.Flags[flagKey];
+func (je *JSONEvaluator) evaluateVariant(
+	flagKey string,
+	context gen.Context,
+) (variant string, reason string, err error) {
+	flag, ok := je.state.Flags[flagKey]
 	if !ok {
 		// flag not found
 		return "", model.ErrorReason, errors.New(model.FlagNotFoundErrorCode)
@@ -138,13 +140,13 @@ func (je *JSONEvaluator) evaluateVariant (flagKey string, context gen.Context) (
 
 	// get the targeting logic, if any
 	targeting := flag.Targeting
-	
+
 	if targeting != nil {
 		targetingBytes, err := targeting.MarshalJSON()
 		if err != nil {
 			log.Errorf("Error parsing rules for flag %s, %s", flagKey, err)
 			return "", model.ErrorReason, err
-		} 
+		}
 		contextBytes, err := context.MarshalJSON()
 		if err != nil {
 			log.Errorf("Error parsing context %s", err)
@@ -152,7 +154,7 @@ func (je *JSONEvaluator) evaluateVariant (flagKey string, context gen.Context) (
 		}
 
 		var result bytes.Buffer
-		
+
 		// evaluate json-logic rules to determine the variant
 		err = jsonlogic.Apply(bytes.NewReader(targetingBytes), bytes.NewReader(contextBytes), &result)
 		if err != nil {
@@ -164,7 +166,7 @@ func (je *JSONEvaluator) evaluateVariant (flagKey string, context gen.Context) (
 	}
 
 	// if this is a valid variant, return it
-	if _, ok :=  je.state.Flags[flagKey].Variants[variant]; ok {
+	if _, ok := je.state.Flags[flagKey].Variants[variant]; ok {
 		return variant, model.TargetingMatchReason, nil
 	}
 

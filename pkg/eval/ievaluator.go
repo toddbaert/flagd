@@ -12,5 +12,8 @@ type IEvaluator interface {
 	ResolveBooleanValue(flagKey string, defaultValue bool, context gen.Context) (value bool, reason string, err error)
 	ResolveStringValue(flagKey string, defaultValue string, context gen.Context) (value string, reason string, err error)
 	ResolveNumberValue(flagKey string, defaultValue float32, context gen.Context) (value float32, reason string, err error)
-	ResolveObjectValue(flagKey string, defaultValue map[string]interface{}, context gen.Context) (value map[string]interface{}, reasons string, err error)
-} 
+	ResolveObjectValue(
+		flagKey string,
+		defaultValue map[string]interface{},
+		context gen.Context) (value map[string]interface{}, reasons string, err error)
+}

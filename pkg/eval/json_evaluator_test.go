@@ -38,14 +38,17 @@ const ValidFlags = `{
   }
 }`
 
-const StaticBoolFlag = "staticBoolFlag"
-const StaticBoolValue = true
-const StaticStringFlag = "staticStringFlag"
-const StaticStringValue = "#CC0000"
-const StaticNumberFlag = "staticNumberFlag"
-const StaticNumberValue float32 = 1
-const StaticObjectFlag = "staticObjectFlag"
-const StaticObjectValue = `{"abc": 123}`
+const (
+	StaticBoolFlag            = "staticBoolFlag"
+	StaticBoolValue           = true
+	StaticStringFlag          = "staticStringFlag"
+	StaticStringValue         = "#CC0000"
+	StaticNumberFlag          = "staticNumberFlag"
+	StaticNumberValue float32 = 1
+	StaticObjectFlag          = "staticObjectFlag"
+	StaticObjectValue         = `{"abc": 123}`
+)
+
 var StaticFlags = fmt.Sprintf(`{
   "flags": {
     "%s": {
@@ -84,19 +87,22 @@ var StaticFlags = fmt.Sprintf(`{
     }
   }
 }`,
-StaticBoolFlag,
-StaticBoolValue,
-StaticStringFlag,
-StaticStringValue,
-StaticNumberFlag,
-StaticNumberValue,
-StaticObjectFlag,
-StaticObjectValue)
+	StaticBoolFlag,
+	StaticBoolValue,
+	StaticStringFlag,
+	StaticStringValue,
+	StaticNumberFlag,
+	StaticNumberValue,
+	StaticObjectFlag,
+	StaticObjectValue)
 
-const DynamicFlag = "targetingFlag";
-const ColorProp = "color";
-const ColorValue = "yellow";
-var DynamicFlags = fmt.Sprintf( `{
+const (
+	DynamicFlag = "targetingFlag"
+	ColorProp   = "color"
+	ColorValue  = "yellow"
+)
+
+var DynamicFlags = fmt.Sprintf(`{
   "flags": {
     "%s": {
       "state": "ENABLED",
@@ -126,10 +132,13 @@ var DynamicFlags = fmt.Sprintf( `{
 }`, DynamicFlag, ColorProp, ColorValue)
 
 func TestGetState_Valid_ContainsFlag(t *testing.T) {
-	evaluator := JsonEvaluator{}
+	evaluator := JSONEvaluator{}
 	// set the state internally
-	json.Unmarshal([]byte(ValidFlags), &evaluator.state)
-	
+	err := json.Unmarshal([]byte(ValidFlags), &evaluator.state)
+	if err != nil {
+		t.Fatalf("Expected no error")
+	}
+
 	// get the state
 	state, err := evaluator.GetState()
 	if err != nil {
@@ -144,7 +153,7 @@ func TestGetState_Valid_ContainsFlag(t *testing.T) {
 }
 
 func TestSetState_Invalid_Error(t *testing.T) {
-	evaluator := JsonEvaluator{}
+	evaluator := JSONEvaluator{}
 
 	// set state with an invalid flag definition
 	err := evaluator.SetState(InvalidFlags)
@@ -154,7 +163,7 @@ func TestSetState_Invalid_Error(t *testing.T) {
 }
 
 func TestSetState_Valid_NoError(t *testing.T) {
-	evaluator := JsonEvaluator{}
+	evaluator := JSONEvaluator{}
 
 	// set state with a valid flag definition
 	err := evaluator.SetState(ValidFlags)
@@ -164,7 +173,7 @@ func TestSetState_Valid_NoError(t *testing.T) {
 }
 
 func TestResolveBooleanValue_FlagExistsStatic_ReturnsValue(t *testing.T) {
-	evaluator := JsonEvaluator{}
+	evaluator := JSONEvaluator{}
 
 	// set state with an static flag definition
 	err := evaluator.SetState(StaticFlags)
@@ -182,7 +191,7 @@ func TestResolveBooleanValue_FlagExistsStatic_ReturnsValue(t *testing.T) {
 }
 
 func TestResolveBooleanValue_NotBoolean_Error(t *testing.T) {
-	evaluator := JsonEvaluator{}
+	evaluator := JSONEvaluator{}
 
 	// set state with an static flag definition
 	err := evaluator.SetState(StaticFlags)
@@ -196,7 +205,7 @@ func TestResolveBooleanValue_NotBoolean_Error(t *testing.T) {
 }
 
 func TestResolveStringValue_FlagExistsStatic_ReturnsValue(t *testing.T) {
-	evaluator := JsonEvaluator{}
+	evaluator := JSONEvaluator{}
 
 	// set state with an static flag definition
 	err := evaluator.SetState(StaticFlags)
@@ -214,7 +223,7 @@ func TestResolveStringValue_FlagExistsStatic_ReturnsValue(t *testing.T) {
 }
 
 func TestResolveStringValue_NotString_Error(t *testing.T) {
-	evaluator := JsonEvaluator{}
+	evaluator := JSONEvaluator{}
 
 	// set state with an static flag definition
 	err := evaluator.SetState(StaticFlags)
@@ -228,7 +237,7 @@ func TestResolveStringValue_NotString_Error(t *testing.T) {
 }
 
 func TestResolveNumberValue_FlagExistsStatic_ReturnsValue(t *testing.T) {
-	evaluator := JsonEvaluator{}
+	evaluator := JSONEvaluator{}
 
 	// set state with an static flag definition
 	err := evaluator.SetState(StaticFlags)
@@ -246,7 +255,7 @@ func TestResolveNumberValue_FlagExistsStatic_ReturnsValue(t *testing.T) {
 }
 
 func TestResolveNumberValue_NotNumber_Error(t *testing.T) {
-	evaluator := JsonEvaluator{}
+	evaluator := JSONEvaluator{}
 
 	// set state with an static flag definition
 	err := evaluator.SetState(StaticFlags)
@@ -260,7 +269,7 @@ func TestResolveNumberValue_NotNumber_Error(t *testing.T) {
 }
 
 func TestResolveObjectValue_FlagExistsStatic_ReturnsValue(t *testing.T) {
-	evaluator := JsonEvaluator{}
+	evaluator := JSONEvaluator{}
 
 	// set state with an static flag definition
 	err := evaluator.SetState(StaticFlags)
@@ -270,7 +279,7 @@ func TestResolveObjectValue_FlagExistsStatic_ReturnsValue(t *testing.T) {
 
 	// evaluate
 	wantedVal := StaticObjectValue
-	val, reason, err := evaluator.ResolveObjectValue(StaticObjectFlag, map[string]interface{}{ "def": 123 }, gen.Context{})
+	val, reason, err := evaluator.ResolveObjectValue(StaticObjectFlag, map[string]interface{}{"def": 123}, gen.Context{})
 	if assert.NoError(t, err) {
 		marshalled, err := json.Marshal(val)
 		if assert.NoError(t, err) {
@@ -278,11 +287,10 @@ func TestResolveObjectValue_FlagExistsStatic_ReturnsValue(t *testing.T) {
 			assert.Equal(t, reason, model.StaticReason)
 		}
 	}
-
 }
 
 func TestResolveObjectValue_NotObject_Error(t *testing.T) {
-	evaluator := JsonEvaluator{}
+	evaluator := JSONEvaluator{}
 
 	// set state with an static flag definition
 	err := evaluator.SetState(StaticFlags)
@@ -291,12 +299,12 @@ func TestResolveObjectValue_NotObject_Error(t *testing.T) {
 	}
 
 	// evaluate a non-object flag
-	_, _, err = evaluator.ResolveObjectValue(StaticBoolFlag, map[string]interface{}{ "def": 123 }, gen.Context{})
+	_, _, err = evaluator.ResolveObjectValue(StaticBoolFlag, map[string]interface{}{"def": 123}, gen.Context{})
 	assert.EqualError(t, err, model.TypeMismatchErrorCode)
 }
 
 func TestResolveXxxValue_TargetingResolvesVariant_DynamicValue(t *testing.T) {
-	evaluator := JsonEvaluator{}
+	evaluator := JSONEvaluator{}
 
 	// set state with an static flag definition
 	err := evaluator.SetState(DynamicFlags)
@@ -305,9 +313,9 @@ func TestResolveXxxValue_TargetingResolvesVariant_DynamicValue(t *testing.T) {
 	}
 
 	// evaluate the dynamic flag, this should return a variant, and therefor reasons should be TARGET_MATCH
-	val, reason, err := evaluator.ResolveBooleanValue(DynamicFlag, false, gen.Context{ AdditionalProperties: map[string]interface{}{
+	val, reason, err := evaluator.ResolveBooleanValue(DynamicFlag, false, gen.Context{AdditionalProperties: map[string]interface{}{
 		ColorProp: ColorValue,
-		} })
+	}})
 	if assert.NoError(t, err) {
 		assert.True(t, val)
 		assert.Equal(t, reason, model.TargetingMatchReason)
@@ -315,7 +323,7 @@ func TestResolveXxxValue_TargetingResolvesVariant_DynamicValue(t *testing.T) {
 }
 
 func TestResolveXxxValue_TargetingResolvesNonVariant_StaticValue(t *testing.T) {
-	evaluator := JsonEvaluator{}
+	evaluator := JSONEvaluator{}
 
 	// set state with an static flag definition
 	err := evaluator.SetState(DynamicFlags)
@@ -324,9 +332,9 @@ func TestResolveXxxValue_TargetingResolvesNonVariant_StaticValue(t *testing.T) {
 	}
 
 	// evaluate the dynamic flag, this should return null, and therefor reasons should be STATIC
-	val, reason, err := evaluator.ResolveBooleanValue(DynamicFlag, false, gen.Context{ AdditionalProperties: map[string]interface{}{
+	val, reason, err := evaluator.ResolveBooleanValue(DynamicFlag, false, gen.Context{AdditionalProperties: map[string]interface{}{
 		ColorProp: "red", // not the expected value for the targeting to match
-		} })
+	}})
 	if assert.NoError(t, err) {
 		assert.False(t, val)
 		assert.Equal(t, reason, model.StaticReason)

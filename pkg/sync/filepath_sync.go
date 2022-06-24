@@ -53,7 +53,7 @@ func (fs *FilePathSync) Notify(w chan<- INotify) {
 					// K8s exposes config maps as symlinks.
 					// Updates cause a remove event, we need to re-add the watcher in this case.
 					err = watcher.Add(fs.URI)
-					if (err != nil) {
+					if err != nil {
 						log.Fatalf("Error restoring watcher: %s, exiting...", err.Error())
 					}
 					evtType = EEventTypeDelete
