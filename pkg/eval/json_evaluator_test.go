@@ -1,4 +1,4 @@
-package eval
+package eval_test
 
 import (
 	"encoding/json"
@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/open-feature/flagd/pkg/eval"
 	gen "github.com/open-feature/flagd/pkg/generated"
 	"github.com/open-feature/flagd/pkg/model"
 )
@@ -132,9 +133,8 @@ var DynamicFlags = fmt.Sprintf(`{
 }`, DynamicFlag, ColorProp, ColorValue)
 
 func TestGetState_Valid_ContainsFlag(t *testing.T) {
-	evaluator := JSONEvaluator{}
-	// set the state internally
-	err := json.Unmarshal([]byte(ValidFlags), &evaluator.state)
+	evaluator := eval.JSONEvaluator{}
+	err := evaluator.SetState(ValidFlags)
 	if err != nil {
 		t.Fatalf("Expected no error")
 	}
@@ -153,7 +153,7 @@ func TestGetState_Valid_ContainsFlag(t *testing.T) {
 }
 
 func TestSetState_Invalid_Error(t *testing.T) {
-	evaluator := JSONEvaluator{}
+	evaluator := eval.JSONEvaluator{}
 
 	// set state with an invalid flag definition
 	err := evaluator.SetState(InvalidFlags)
@@ -163,7 +163,7 @@ func TestSetState_Invalid_Error(t *testing.T) {
 }
 
 func TestSetState_Valid_NoError(t *testing.T) {
-	evaluator := JSONEvaluator{}
+	evaluator := eval.JSONEvaluator{}
 
 	// set state with a valid flag definition
 	err := evaluator.SetState(ValidFlags)
@@ -173,7 +173,7 @@ func TestSetState_Valid_NoError(t *testing.T) {
 }
 
 func TestResolveBooleanValue_FlagExistsStatic_ReturnsValue(t *testing.T) {
-	evaluator := JSONEvaluator{}
+	evaluator := eval.JSONEvaluator{}
 
 	// set state with an static flag definition
 	err := evaluator.SetState(StaticFlags)
@@ -191,7 +191,7 @@ func TestResolveBooleanValue_FlagExistsStatic_ReturnsValue(t *testing.T) {
 }
 
 func TestResolveBooleanValue_NotBoolean_Error(t *testing.T) {
-	evaluator := JSONEvaluator{}
+	evaluator := eval.JSONEvaluator{}
 
 	// set state with an static flag definition
 	err := evaluator.SetState(StaticFlags)
@@ -205,7 +205,7 @@ func TestResolveBooleanValue_NotBoolean_Error(t *testing.T) {
 }
 
 func TestResolveStringValue_FlagExistsStatic_ReturnsValue(t *testing.T) {
-	evaluator := JSONEvaluator{}
+	evaluator := eval.JSONEvaluator{}
 
 	// set state with an static flag definition
 	err := evaluator.SetState(StaticFlags)
@@ -223,7 +223,7 @@ func TestResolveStringValue_FlagExistsStatic_ReturnsValue(t *testing.T) {
 }
 
 func TestResolveStringValue_NotString_Error(t *testing.T) {
-	evaluator := JSONEvaluator{}
+	evaluator := eval.JSONEvaluator{}
 
 	// set state with an static flag definition
 	err := evaluator.SetState(StaticFlags)
@@ -237,7 +237,7 @@ func TestResolveStringValue_NotString_Error(t *testing.T) {
 }
 
 func TestResolveNumberValue_FlagExistsStatic_ReturnsValue(t *testing.T) {
-	evaluator := JSONEvaluator{}
+	evaluator := eval.JSONEvaluator{}
 
 	// set state with an static flag definition
 	err := evaluator.SetState(StaticFlags)
@@ -255,7 +255,7 @@ func TestResolveNumberValue_FlagExistsStatic_ReturnsValue(t *testing.T) {
 }
 
 func TestResolveNumberValue_NotNumber_Error(t *testing.T) {
-	evaluator := JSONEvaluator{}
+	evaluator := eval.JSONEvaluator{}
 
 	// set state with an static flag definition
 	err := evaluator.SetState(StaticFlags)
@@ -269,7 +269,7 @@ func TestResolveNumberValue_NotNumber_Error(t *testing.T) {
 }
 
 func TestResolveObjectValue_FlagExistsStatic_ReturnsValue(t *testing.T) {
-	evaluator := JSONEvaluator{}
+	evaluator := eval.JSONEvaluator{}
 
 	// set state with an static flag definition
 	err := evaluator.SetState(StaticFlags)
@@ -290,7 +290,7 @@ func TestResolveObjectValue_FlagExistsStatic_ReturnsValue(t *testing.T) {
 }
 
 func TestResolveObjectValue_NotObject_Error(t *testing.T) {
-	evaluator := JSONEvaluator{}
+	evaluator := eval.JSONEvaluator{}
 
 	// set state with an static flag definition
 	err := evaluator.SetState(StaticFlags)
@@ -304,9 +304,9 @@ func TestResolveObjectValue_NotObject_Error(t *testing.T) {
 }
 
 func TestResolveXxxValue_TargetingResolvesVariant_DynamicValue(t *testing.T) {
-	evaluator := JSONEvaluator{}
+	evaluator := eval.JSONEvaluator{}
 
-	// set state with an static flag definition
+	// set state with an dynamic flag definition
 	err := evaluator.SetState(DynamicFlags)
 	if err != nil {
 		t.Fatalf("Expected no error")
@@ -323,9 +323,9 @@ func TestResolveXxxValue_TargetingResolvesVariant_DynamicValue(t *testing.T) {
 }
 
 func TestResolveXxxValue_TargetingResolvesNonVariant_StaticValue(t *testing.T) {
-	evaluator := JSONEvaluator{}
+	evaluator := eval.JSONEvaluator{}
 
-	// set state with an static flag definition
+	// set state with an dynamic flag definition
 	err := evaluator.SetState(DynamicFlags)
 	if err != nil {
 		t.Fatalf("Expected no error")
