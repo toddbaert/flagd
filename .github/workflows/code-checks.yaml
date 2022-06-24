@@ -9,7 +9,7 @@ on:
       - main
 
 jobs:
-  Lint:
+  Test-and-Lint:
     runs-on: ubuntu-latest
     env:
       GOPATH: /home/runner/work/open-feature/flagd
@@ -19,6 +19,7 @@ jobs:
       - name: Setup go
         uses: actions/setup-go@v1
         with:
-          go-version: '^1.16.0'
+          go-version: "^1.17.0"
       - run: make generate
       - run: make lint
+      - run: make test
