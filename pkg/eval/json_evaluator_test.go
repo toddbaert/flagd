@@ -40,17 +40,28 @@ const ValidFlags = `{
 }`
 
 const (
-	StaticBoolFlag            = "staticBoolFlag"
-	StaticBoolValue           = true
-	StaticStringFlag          = "staticStringFlag"
-	StaticStringValue         = "#CC0000"
-	StaticNumberFlag          = "staticNumberFlag"
-	StaticNumberValue float32 = 1
-	StaticObjectFlag          = "staticObjectFlag"
-	StaticObjectValue         = `{"abc": 123}`
+	MissingFlag                = "missingFlag"
+	StaticBoolFlag             = "staticBoolFlag"
+	StaticBoolValue            = true
+	StaticStringFlag           = "staticStringFlag"
+	StaticStringValue          = "#CC0000"
+	StaticNumberFlag           = "staticNumberFlag"
+	StaticNumberValue  float32 = 1
+	StaticObjectFlag           = "staticObjectFlag"
+	StaticObjectValue          = `{"abc": 123}`
+	DynamicBoolFlag            = "targetingBoolFlag"
+	DynamicBoolValue           = true
+	DynamicStringFlag          = "targetingStringFlag"
+	DynamicStringValue         = "my-string"
+	DynamicNumberFlag          = "targetingNumberFlag"
+	DynamicNumberValue float32 = 100
+	DynamicObjectFlag          = "targetingObjectFlag"
+	DynamicObjectValue         = `{ "key": true }`
+	ColorProp                  = "color"
+	ColorValue                 = "yellow"
 )
 
-var StaticFlags = fmt.Sprintf(`{
+var Flags = fmt.Sprintf(`{
   "flags": {
     "%s": {
       "state": "ENABLED",
@@ -85,33 +96,14 @@ var StaticFlags = fmt.Sprintf(`{
 				}
       },
       "defaultVariant": "obj1"
-    }
-  }
-}`,
-	StaticBoolFlag,
-	StaticBoolValue,
-	StaticStringFlag,
-	StaticStringValue,
-	StaticNumberFlag,
-	StaticNumberValue,
-	StaticObjectFlag,
-	StaticObjectValue)
-
-const (
-	DynamicFlag = "targetingFlag"
-	ColorProp   = "color"
-	ColorValue  = "yellow"
-)
-
-var DynamicFlags = fmt.Sprintf(`{
-  "flags": {
-    "%s": {
+    },
+		"%s": {
       "state": "ENABLED",
       "variants": {
-        "on": true,
-        "off": false
+        "bool1": %t,
+        "bool2": false
       },
-      "defaultVariant": "off",
+      "defaultVariant": "bool2",
 			"targeting": {
         "if": [
           {
@@ -124,13 +116,109 @@ var DynamicFlags = fmt.Sprintf(`{
               "%s"
             ]
           },
-          "on",
+          "bool1",
+          null
+        ]
+      }
+    },
+		"%s": {
+      "state": "ENABLED",
+      "variants": {
+        "str1": "%s",
+        "str2": "other"
+      },
+      "defaultVariant": "str2",
+			"targeting": {
+        "if": [
+          {
+            "==": [
+              {
+                "var": [
+                  "%s"
+                ]
+              },
+              "%s"
+            ]
+          },
+          "str1",
+          null
+        ]
+      }
+    },
+		"%s": {
+      "state": "ENABLED",
+      "variants": {
+        "number1": %f,
+        "number2": 200
+      },
+      "defaultVariant": "number2",
+			"targeting": {
+        "if": [
+          {
+            "==": [
+              {
+                "var": [
+                  "%s"
+                ]
+              },
+              "%s"
+            ]
+          },
+          "number1",
+          null
+        ]
+      }
+    },
+		"%s": {
+      "state": "ENABLED",
+      "variants": {
+        "object1": %s,
+        "object2": {}
+      },
+      "defaultVariant": "object2",
+			"targeting": {
+        "if": [
+          {
+            "==": [
+              {
+                "var": [
+                  "%s"
+                ]
+              },
+              "%s"
+            ]
+          },
+          "object1",
           null
         ]
       }
     }
   }
-}`, DynamicFlag, ColorProp, ColorValue)
+}`,
+	StaticBoolFlag,
+	StaticBoolValue,
+	StaticStringFlag,
+	StaticStringValue,
+	StaticNumberFlag,
+	StaticNumberValue,
+	StaticObjectFlag,
+	StaticObjectValue,
+	DynamicBoolFlag,
+	DynamicBoolValue,
+	ColorProp,
+	ColorValue,
+	DynamicStringFlag,
+	DynamicStringValue,
+	ColorProp,
+	ColorValue,
+	DynamicNumberFlag,
+	DynamicNumberValue,
+	ColorProp,
+	ColorValue,
+	DynamicObjectFlag,
+	DynamicObjectValue,
+	ColorProp,
+	ColorValue)
 
 func TestGetState_Valid_ContainsFlag(t *testing.T) {
 	evaluator := eval.JSONEvaluator{}
@@ -172,171 +260,157 @@ func TestSetState_Valid_NoError(t *testing.T) {
 	}
 }
 
-func TestResolveBooleanValue_FlagExistsStatic_ReturnsValue(t *testing.T) {
-	evaluator := eval.JSONEvaluator{}
+func TestResolveBooleanValue(t *testing.T) {
+	tests := []struct {
+		flagKey      string
+		defaultValue bool
+		context      gen.Context
+		val          bool
+		reason       string
+		errorCode    string
+	}{
+		{StaticBoolFlag, false, gen.Context{}, StaticBoolValue, model.StaticReason, ""},
+		{DynamicBoolFlag, false, gen.Context{AdditionalProperties: map[string]interface{}{
+			ColorProp: ColorValue,
+		}}, StaticBoolValue, model.TargetingMatchReason, ""},
+		{StaticObjectFlag, false, gen.Context{}, StaticBoolValue, model.ErrorReason, model.TypeMismatchErrorCode},
+		{MissingFlag, false, gen.Context{}, StaticBoolValue, model.ErrorReason, model.FlagNotFoundErrorCode},
+	}
 
-	// set state with an static flag definition
-	err := evaluator.SetState(StaticFlags)
+	evaluator := eval.JSONEvaluator{}
+	err := evaluator.SetState(Flags)
 	if err != nil {
 		t.Fatalf("Expected no error")
 	}
 
-	// evaluate
-	wantedVal := StaticBoolValue
-	val, reason, err := evaluator.ResolveBooleanValue(StaticBoolFlag, false, gen.Context{})
-	if assert.NoError(t, err) {
-		assert.Equal(t, val, wantedVal)
-		assert.Equal(t, reason, model.StaticReason)
-	}
-}
+	for _, test := range tests {
+		val, reason, err := evaluator.ResolveBooleanValue(test.flagKey, test.defaultValue, test.context)
 
-func TestResolveBooleanValue_NotBoolean_Error(t *testing.T) {
-	evaluator := eval.JSONEvaluator{}
-
-	// set state with an static flag definition
-	err := evaluator.SetState(StaticFlags)
-	if err != nil {
-		t.Fatalf("Expected no error")
-	}
-
-	// evaluate a non-boolean flag
-	_, _, err = evaluator.ResolveBooleanValue(StaticObjectFlag, false, gen.Context{})
-	assert.EqualError(t, err, model.TypeMismatchErrorCode)
-}
-
-func TestResolveStringValue_FlagExistsStatic_ReturnsValue(t *testing.T) {
-	evaluator := eval.JSONEvaluator{}
-
-	// set state with an static flag definition
-	err := evaluator.SetState(StaticFlags)
-	if err != nil {
-		t.Fatalf("Expected no error")
-	}
-
-	// evaluate
-	wantedVal := StaticStringValue
-	val, reason, err := evaluator.ResolveStringValue(StaticStringFlag, "other", gen.Context{})
-	if assert.NoError(t, err) {
-		assert.Equal(t, val, wantedVal)
-		assert.Equal(t, reason, model.StaticReason)
-	}
-}
-
-func TestResolveStringValue_NotString_Error(t *testing.T) {
-	evaluator := eval.JSONEvaluator{}
-
-	// set state with an static flag definition
-	err := evaluator.SetState(StaticFlags)
-	if err != nil {
-		t.Fatalf("Expected no error")
-	}
-
-	// evaluate a non-string flag
-	_, _, err = evaluator.ResolveStringValue(StaticObjectFlag, "other", gen.Context{})
-	assert.EqualError(t, err, model.TypeMismatchErrorCode)
-}
-
-func TestResolveNumberValue_FlagExistsStatic_ReturnsValue(t *testing.T) {
-	evaluator := eval.JSONEvaluator{}
-
-	// set state with an static flag definition
-	err := evaluator.SetState(StaticFlags)
-	if err != nil {
-		t.Fatalf("Expected no error")
-	}
-
-	// evaluate
-	wantedVal := StaticNumberValue
-	val, reason, err := evaluator.ResolveNumberValue(StaticNumberFlag, 0, gen.Context{})
-	if assert.NoError(t, err) {
-		assert.Equal(t, val, wantedVal)
-		assert.Equal(t, reason, model.StaticReason)
-	}
-}
-
-func TestResolveNumberValue_NotNumber_Error(t *testing.T) {
-	evaluator := eval.JSONEvaluator{}
-
-	// set state with an static flag definition
-	err := evaluator.SetState(StaticFlags)
-	if err != nil {
-		t.Fatalf("Expected no error")
-	}
-
-	// evaluate a non-number flag
-	_, _, err = evaluator.ResolveNumberValue(StaticObjectFlag, 0, gen.Context{})
-	assert.EqualError(t, err, model.TypeMismatchErrorCode)
-}
-
-func TestResolveObjectValue_FlagExistsStatic_ReturnsValue(t *testing.T) {
-	evaluator := eval.JSONEvaluator{}
-
-	// set state with an static flag definition
-	err := evaluator.SetState(StaticFlags)
-	if err != nil {
-		t.Fatalf("Expected no error")
-	}
-
-	// evaluate
-	wantedVal := StaticObjectValue
-	val, reason, err := evaluator.ResolveObjectValue(StaticObjectFlag, map[string]interface{}{"def": 123}, gen.Context{})
-	if assert.NoError(t, err) {
-		marshalled, err := json.Marshal(val)
-		if assert.NoError(t, err) {
-			assert.JSONEq(t, string(marshalled), wantedVal)
-			assert.Equal(t, reason, model.StaticReason)
+		if test.errorCode == "" {
+			if assert.NoError(t, err) {
+				assert.Equal(t, test.val, val)
+				assert.Equal(t, test.reason, reason)
+			}
+		} else {
+			assert.Equal(t, reason, model.ErrorReason)
+			assert.EqualError(t, err, test.errorCode)
 		}
 	}
 }
 
-func TestResolveObjectValue_NotObject_Error(t *testing.T) {
-	evaluator := eval.JSONEvaluator{}
+func TestResolveStringValue(t *testing.T) {
+	tests := []struct {
+		flagKey      string
+		defaultValue string
+		context      gen.Context
+		val          string
+		reason       string
+		errorCode    string
+	}{
+		{StaticStringFlag, "default", gen.Context{}, StaticStringValue, model.StaticReason, ""},
+		{DynamicStringFlag, "default", gen.Context{AdditionalProperties: map[string]interface{}{
+			ColorProp: ColorValue,
+		}}, DynamicStringValue, model.TargetingMatchReason, ""},
+		{StaticObjectFlag, "default", gen.Context{}, "", model.ErrorReason, model.TypeMismatchErrorCode},
+		{MissingFlag, "default", gen.Context{}, "", model.ErrorReason, model.FlagNotFoundErrorCode},
+	}
 
-	// set state with an static flag definition
-	err := evaluator.SetState(StaticFlags)
+	evaluator := eval.JSONEvaluator{}
+	err := evaluator.SetState(Flags)
 	if err != nil {
 		t.Fatalf("Expected no error")
 	}
 
-	// evaluate a non-object flag
-	_, _, err = evaluator.ResolveObjectValue(StaticBoolFlag, map[string]interface{}{"def": 123}, gen.Context{})
-	assert.EqualError(t, err, model.TypeMismatchErrorCode)
+	for _, test := range tests {
+		val, reason, err := evaluator.ResolveStringValue(test.flagKey, test.defaultValue, test.context)
+
+		if test.errorCode == "" {
+			if assert.NoError(t, err) {
+				assert.Equal(t, test.val, val)
+				assert.Equal(t, test.reason, reason)
+			}
+		} else {
+			assert.Equal(t, reason, model.ErrorReason)
+			assert.EqualError(t, err, test.errorCode)
+		}
+	}
 }
 
-func TestResolveXxxValue_TargetingResolvesVariant_DynamicValue(t *testing.T) {
-	evaluator := eval.JSONEvaluator{}
+func TestResolveNumberValue(t *testing.T) {
+	tests := []struct {
+		flagKey      string
+		defaultValue float32
+		context      gen.Context
+		val          float32
+		reason       string
+		errorCode    string
+	}{
+		{StaticNumberFlag, 13, gen.Context{}, StaticNumberValue, model.StaticReason, ""},
+		{DynamicNumberFlag, 13, gen.Context{AdditionalProperties: map[string]interface{}{
+			ColorProp: ColorValue,
+		}}, DynamicNumberValue, model.TargetingMatchReason, ""},
+		{StaticObjectFlag, 13, gen.Context{}, 13, model.ErrorReason, model.TypeMismatchErrorCode},
+		{MissingFlag, 13, gen.Context{}, 13, model.ErrorReason, model.FlagNotFoundErrorCode},
+	}
 
-	// set state with an dynamic flag definition
-	err := evaluator.SetState(DynamicFlags)
+	evaluator := eval.JSONEvaluator{}
+	err := evaluator.SetState(Flags)
 	if err != nil {
 		t.Fatalf("Expected no error")
 	}
 
-	// evaluate the dynamic flag, this should return a variant, and therefor reasons should be TARGET_MATCH
-	val, reason, err := evaluator.ResolveBooleanValue(DynamicFlag, false, gen.Context{AdditionalProperties: map[string]interface{}{
-		ColorProp: ColorValue,
-	}})
-	if assert.NoError(t, err) {
-		assert.True(t, val)
-		assert.Equal(t, reason, model.TargetingMatchReason)
+	for _, test := range tests {
+		val, reason, err := evaluator.ResolveNumberValue(test.flagKey, test.defaultValue, test.context)
+
+		if test.errorCode == "" {
+			if assert.NoError(t, err) {
+				assert.Equal(t, test.val, val)
+				assert.Equal(t, test.reason, reason)
+			}
+		} else {
+			assert.Equal(t, reason, model.ErrorReason)
+			assert.EqualError(t, err, test.errorCode)
+		}
 	}
 }
 
-func TestResolveXxxValue_TargetingResolvesNonVariant_StaticValue(t *testing.T) {
-	evaluator := eval.JSONEvaluator{}
+func TestResolveObjectValue(t *testing.T) {
+	tests := []struct {
+		flagKey      string
+		defaultValue map[string]interface{}
+		context      gen.Context
+		val          string
+		reason       string
+		errorCode    string
+	}{
+		{StaticObjectFlag, map[string]interface{}{}, gen.Context{}, StaticObjectValue, model.StaticReason, ""},
+		{DynamicObjectFlag, map[string]interface{}{}, gen.Context{AdditionalProperties: map[string]interface{}{
+			ColorProp: ColorValue,
+		}}, DynamicObjectValue, model.TargetingMatchReason, ""},
+		{StaticBoolFlag, map[string]interface{}{}, gen.Context{}, "{}", model.ErrorReason, model.TypeMismatchErrorCode},
+		{MissingFlag, map[string]interface{}{}, gen.Context{}, "{}", model.ErrorReason, model.FlagNotFoundErrorCode},
+	}
 
-	// set state with an dynamic flag definition
-	err := evaluator.SetState(DynamicFlags)
+	evaluator := eval.JSONEvaluator{}
+	err := evaluator.SetState(Flags)
 	if err != nil {
 		t.Fatalf("Expected no error")
 	}
 
-	// evaluate the dynamic flag, this should return null, and therefor reasons should be STATIC
-	val, reason, err := evaluator.ResolveBooleanValue(DynamicFlag, false, gen.Context{AdditionalProperties: map[string]interface{}{
-		ColorProp: "red", // not the expected value for the targeting to match
-	}})
-	if assert.NoError(t, err) {
-		assert.False(t, val)
-		assert.Equal(t, reason, model.StaticReason)
+	for _, test := range tests {
+		val, reason, err := evaluator.ResolveObjectValue(test.flagKey, test.defaultValue, test.context)
+
+		if test.errorCode == "" {
+			if assert.NoError(t, err) {
+				marshalled, err := json.Marshal(val)
+				if assert.NoError(t, err) {
+					assert.JSONEq(t, test.val, string(marshalled))
+					assert.Equal(t, test.reason, reason)
+				}
+			}
+		} else {
+			assert.Equal(t, reason, model.ErrorReason)
+			assert.EqualError(t, err, test.errorCode)
+		}
 	}
 }

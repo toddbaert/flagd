@@ -86,7 +86,7 @@ func (je *JSONEvaluator) ResolveStringValue(flagKey string, defaultValue string,
 		log.Errorf("Error converting %s to string", flagKey)
 		return defaultValue, model.ErrorReason, errors.New(model.TypeMismatchErrorCode)
 	}
-	return val, model.StaticReason, nil
+	return val, reason, nil
 }
 
 func (je *JSONEvaluator) ResolveNumberValue(flagKey string, defaultValue float32, context gen.Context) (
@@ -105,7 +105,7 @@ func (je *JSONEvaluator) ResolveNumberValue(flagKey string, defaultValue float32
 		log.Errorf("Error converting %s to float32", flagKey)
 		return defaultValue, model.ErrorReason, errors.New(model.TypeMismatchErrorCode)
 	}
-	return float32(val), model.StaticReason, nil
+	return float32(val), reason, nil
 }
 
 func (je *JSONEvaluator) ResolveObjectValue(flagKey string, defaultValue map[string]interface{}, context gen.Context) (
@@ -124,7 +124,7 @@ func (je *JSONEvaluator) ResolveObjectValue(flagKey string, defaultValue map[str
 		log.Errorf(fmt.Sprintf("Error converting %s to object", flagKey))
 		return defaultValue, model.ErrorReason, errors.New(model.TypeMismatchErrorCode)
 	}
-	return val, model.StaticReason, nil
+	return val, reason, nil
 }
 
 // runs the rules (if defined) to determine the variant, otherwise falling through to the default
