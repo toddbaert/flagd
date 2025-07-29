@@ -75,7 +75,7 @@ func (mr *MockIEvaluatorMockRecorder) ResolveAllValues(ctx, reqID, context any) 
 }
 
 // ResolveAsAnyValue mocks base method.
-func (m *MockIEvaluator) ResolveAsAnyValue(ctx context.Context, reqID, flagKey string, context map[string]any) evaluator.AnyValue {
+func (m *MockIEvaluator) ResolveAsAnyValue(ctx context.Context, reqID, flagKey string, flagSetId string, context map[string]any) evaluator.AnyValue {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ResolveAsAnyValue", ctx, reqID, flagKey, context)
 	ret0, _ := ret[0].(evaluator.AnyValue)

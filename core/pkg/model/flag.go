@@ -10,6 +10,8 @@ type Flag struct {
 	Source         string          `json:"source"`
 	Selector       string          `json:"selector"`
 	Metadata       Metadata        `json:"metadata,omitempty"`
+	FlagSetId      string          `json:"-"`
+	Key            string          `json:"-"`
 }
 
 type Evaluators struct {

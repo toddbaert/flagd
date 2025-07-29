@@ -74,6 +74,7 @@ type IResolver interface {
 		ctx context.Context,
 		reqID string,
 		flagKey string,
+		flagSetId string,
 		context map[string]any) AnyValue
 	ResolveAllValues(
 		ctx context.Context,

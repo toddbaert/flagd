@@ -34,11 +34,7 @@ type Multiplexer struct {
 
 type subscription struct {
 	id      interface{}
-	channel chan payload
-}
-
-type payload struct {
-	flags string
+	channel chan store.Payload
 }
 
 // NewMux creates a new sync multiplexer
@@ -55,47 +51,12 @@ func NewMux(store *store.State, sources []string) (*Multiplexer, error) {
 }
 
 // Register a subscription
-func (r *Multiplexer) Register(id interface{}, source string, con chan payload) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	if source != "" && !slices.Contains(r.sources, source) {
-		return fmt.Errorf("no flag watcher setup for source %s", source)
-	}
-
-	var initSync string
-
-	if source == "" {
-		// subscribe for flags from all source
-		r.subs[id] = subscription{
-			id:      id,
-			channel: con,
-		}
-
-		initSync = r.allFlags
-	} else {
-		// subscribe for specific source
-		s, ok := r.selectorSubs[source]
-		if ok {
-			s[id] = subscription{
-				id:      id,
-				channel: con,
-			}
-		} else {
-			r.selectorSubs[source] = map[interface{}]subscription{
-				id: {
-					id:      id,
-					channel: con,
-				},
-			}
-		}
-
-		initSync = r.selectorFlags[source]
-	}
-
-	// Initial sync
-	con <- payload{flags: initSync}
-	return nil
+func (r *Multiplexer) Register(ctx context.Context, source string, con chan store.Payload, selector string) (store.Payload, error) {
+	payload, _, _ := r.store.GetAll(ctx, con, selector)
+	b, _ := json.Marshal(payload)
+	return store.Payload{
+		Flags: string(b),
+	}, nil
 }
 
 // Publish sync updates to subscriptions
@@ -111,13 +72,13 @@ func (r *Multiplexer) Publish() error {
 
 	// push to all source subs
 	for _, sub := range r.subs {
-		sub.channel <- payload{r.allFlags}
+		sub.channel <- store.Payload{Flags: r.allFlags}
 	}
 
 	// push to selector subs
 	for source, flags := range r.selectorFlags {
 		for _, s := range r.selectorSubs[source] {
-			s.channel <- payload{flags}
+			s.channel <- store.Payload{Flags: flags}
 		}
 	}
 
@@ -172,7 +133,7 @@ func (r *Multiplexer) reFill() error {
 		r.selectorFlags[source] = string(emptyConfigBytes)
 	}
 
-	all, metadata, err := r.store.GetAll(context.Background())
+	all, metadata, err := r.store.GetAll(context.Background(), nil, "")
 	if err != nil {
 		return fmt.Errorf("error retrieving flags from the store: %w", err)
 	}

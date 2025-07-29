@@ -79,7 +79,7 @@ func FromConfig(logger *logger.Logger, version string, config Config) (*Runtime,
 	}
 
 	// build flag store, collect flag sources & fill sources details
-	s := store.NewFlags()
+	s := store.NewFlags(logger)
 	sources := []string{}
 
 	for _, provider := range config.SyncProviders {

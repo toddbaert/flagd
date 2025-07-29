@@ -59,6 +59,8 @@ func (h *handler) HandleFlagEvaluation(w http.ResponseWriter, r *http.Request) {
 	}
 
 	flagKey := vars[key]
+	flagSetId := r.Header.Get("X-Selector")
+
 	request, err := extractOfrepRequest(r)
 	if err != nil {
 		h.writeJSONToResponse(http.StatusBadRequest, ofrep.ContextErrorResponseFrom(flagKey), w)
@@ -66,7 +68,7 @@ func (h *handler) HandleFlagEvaluation(w http.ResponseWriter, r *http.Request) {
 	}
 	context := flagdContext(h.Logger, requestID, request, h.contextValues, r.Header, h.headerToContextKeyMappings)
 
-	evaluation := h.evaluator.ResolveAsAnyValue(r.Context(), requestID, flagKey, context)
+	evaluation := h.evaluator.ResolveAsAnyValue(r.Context(), requestID, flagKey, flagSetId, context)
 	if evaluation.Error != nil {
 		status, evaluationError := ofrep.EvaluationErrorResponseFrom(evaluation)
 		h.writeJSONToResponse(status, evaluationError, w)
@@ -127,7 +129,7 @@ func extractOfrepRequest(req *http.Request) (ofrep.Request, error) {
 	return request, nil
 }
 
-// flagdContext returns combined context values from headers, static context (from cli) and request context. 
+// flagdContext returns combined context values from headers, static context (from cli) and request context.
 // highest priority > header-context-from-cli > static-context-from-cli > request-context > lowest priority
 func flagdContext(
 	log *logger.Logger, requestID string, request ofrep.Request, staticContextValues map[string]any, headers http.Header, headerToContextKeyMappings map[string]string,

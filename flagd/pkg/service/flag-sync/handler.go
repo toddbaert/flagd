@@ -5,13 +5,15 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"time"
+
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"time"
 
 	"buf.build/gen/go/open-feature/flagd/grpc/go/flagd/sync/v1/syncv1grpc"
 	syncv1 "buf.build/gen/go/open-feature/flagd/protocolbuffers/go/flagd/sync/v1"
 	"github.com/open-feature/flagd/core/pkg/logger"
+	"github.com/open-feature/flagd/core/pkg/store"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
@@ -24,7 +26,7 @@ type syncHandler struct {
 }
 
 func (s syncHandler) SyncFlags(req *syncv1.SyncFlagsRequest, server syncv1grpc.FlagSyncService_SyncFlagsServer) error {
-	muxPayload := make(chan payload, 1)
+	muxPayload := make(chan store.Payload, 1)
 	selector := req.GetSelector()
 	ctx := server.Context()
 
@@ -36,7 +38,11 @@ func (s syncHandler) SyncFlags(req *syncv1.SyncFlagsRequest, server syncv1grpc.F
 		defer cancel()
 	}
 
-	err := s.mux.Register(ctx, selector, muxPayload)
+	payload, err := s.mux.Register(ctx, selector, muxPayload, selector)
+	err = server.Send(&syncv1.SyncFlagsResponse{
+		FlagConfiguration: payload.Flags,
+		SyncContext:       nil,
+	})
 	if err != nil {
 		return err
 	}
@@ -59,7 +65,7 @@ func (s syncHandler) SyncFlags(req *syncv1.SyncFlagsRequest, server syncv1grpc.F
 			}
 
 			err = server.Send(&syncv1.SyncFlagsResponse{
-				FlagConfiguration: payload.flags,
+				FlagConfiguration: payload.Flags,
 				SyncContext:       metadata,
 			})
 			if err != nil {

@@ -1,0 +1,41 @@
+{
+  "$schema": "https://flagd.dev/schema/v0/flags.json",
+  "metadata": {
+    "version": "v1"
+  },
+  "flags": {
+    "myBoolFlag": {
+      "state": "ENABLED",
+      "variants": {
+        "on": true,
+        "off": false
+      },
+      "defaultVariant": "off",
+      "metadata": {
+        "flagSetId": "2"
+      }
+    },
+    "myNewStringFlag": {
+      "state": "ENABLED",
+      "variants": {
+        "key1": "val1",
+        "key2": "val2"
+      },
+      "defaultVariant": "key1",
+      "metadata": {
+        "flagSetId": "2"
+      }
+    },
+    "myNewStringFlag2": {
+      "state": "ENABLED",
+      "variants": {
+        "key1": "val1",
+        "key2": "val2"
+      },
+      "defaultVariant": "key1",
+      "metadata": {
+        "flagSetId": "2"
+      }
+    }
+  }
+}

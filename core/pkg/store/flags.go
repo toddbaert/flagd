@@ -8,17 +8,23 @@ import (
 	"reflect"
 	"sync"
 
+	"github.com/hashicorp/go-memdb"
 	"github.com/open-feature/flagd/core/pkg/logger"
 	"github.com/open-feature/flagd/core/pkg/model"
 )
 
 type del = struct{}
 
+type Payload struct {
+	Flags string
+}
+
 var deleteMarker *del
 
 type IStore interface {
-	GetAll(ctx context.Context) (map[string]model.Flag, model.Metadata, error)
+	GetAll(ctx context.Context, watcher chan Payload, selector string) (map[string]model.Flag, model.Metadata, error)
 	Get(ctx context.Context, key string) (model.Flag, model.Metadata, bool)
+	GetForFlagSet(ctx context.Context, key string, flagSetId string) (model.Flag, model.Metadata, bool)
 	SelectorForFlag(ctx context.Context, flag model.Flag) string
 }
 
@@ -28,6 +34,8 @@ type State struct {
 	FlagSources       []string
 	SourceDetails     map[string]SourceDetails  `json:"sourceMetadata,omitempty"`
 	MetadataPerSource map[string]model.Metadata `json:"metadata,omitempty"`
+	db                *memdb.MemDB
+	logger            *logger.Logger
 }
 
 type SourceDetails struct {
@@ -50,30 +58,114 @@ func (f *State) hasPriority(stored string, new string) bool {
 	return true
 }
 
-func NewFlags() *State {
+func NewFlags(logger *logger.Logger) *State {
+
+	schema := &memdb.DBSchema{
+		Tables: map[string]*memdb.TableSchema{
+			"flags": {
+				Name: "flags",
+				Indexes: map[string]*memdb.IndexSchema{
+					"id": {
+						Name:   "id",
+						Unique: true,
+						Indexer: &memdb.CompoundIndex{
+							Indexes: []memdb.Indexer{
+								&memdb.StringFieldIndex{Field: "Key", Lowercase: false},
+								&memdb.StringFieldIndex{Field: "FlagSetId", Lowercase: false},
+							},
+							AllowMissing: false,
+						},
+					},
+					"flagSetId": {
+						Name:   "flagSetId",
+						Unique: false,
+						Indexer: &memdb.StringFieldIndex{
+							Field: "FlagSetId",
+						},
+					},
+					"keyOnly": {
+						Name:   "keyOnly",
+						Unique: true,
+						Indexer: &memdb.CompoundIndex{
+							Indexes: []memdb.Indexer{
+								&memdb.StringFieldIndex{Field: "Key", Lowercase: false},
+								&memdb.ConditionalIndex{
+									Conditional: func(flag interface{}) (bool, error) {
+										return flag.(model.Flag).FlagSetId == "placeholder", nil
+									},
+								},
+							},
+							AllowMissing: false,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// Create a new data base
+	db, err := memdb.NewMemDB(schema)
+	if err != nil {
+		panic(err)
+	}
+
 	return &State{
 		Flags:             map[string]model.Flag{},
 		SourceDetails:     map[string]SourceDetails{},
 		MetadataPerSource: map[string]model.Metadata{},
+		db:                db,
+		logger:            logger,
 	}
 }
 
 func (f *State) Set(key string, flag model.Flag) {
-	f.mx.Lock()
-	defer f.mx.Unlock()
-	f.Flags[key] = flag
+	txn := f.db.Txn(true)
+
+	var flagSetId string
+	if flag.Metadata["flagSetId"] != nil && flag.Metadata["flagSetId"] != "" {
+		flagSetId = flag.Metadata["flagSetId"].(string)
+		flag.FlagSetId = flagSetId
+	} else {
+		flag.FlagSetId = "placeholder"
+	}
+
+	flag.Key = key
+	txn.Insert("flags", flag)
+	txn.Commit()
 }
 
 func (f *State) Get(_ context.Context, key string) (model.Flag, model.Metadata, bool) {
-	f.mx.RLock()
-	defer f.mx.RUnlock()
-	metadata := f.getMetadata()
-	flag, ok := f.Flags[key]
-	if ok {
-		metadata = f.GetMetadataForSource(flag.Source)
+	txn := f.db.Txn(false)
+	defer txn.Abort()
+
+	raw, err := txn.First("flags", "keyOnly", key, true)
+	if err != nil {
+		panic(err)
 	}
 
-	return flag, metadata, ok
+	flag, ok := raw.(model.Flag)
+	if !ok {
+		return model.Flag{}, model.Metadata{}, false
+	}
+
+	return flag, model.Metadata{}, ok
+}
+
+func (f *State) GetForFlagSet(_ context.Context, key string, flagSetId string) (model.Flag, model.Metadata, bool) {
+	txn := f.db.Txn(false)
+	defer txn.Abort()
+
+	raw, err := txn.First("flags", "id", key, flagSetId)
+	if err != nil {
+		panic(err)
+	}
+
+	flag, ok := raw.(model.Flag)
+	if !ok {
+		return model.Flag{}, model.Metadata{}, false
+	}
+
+	return flag, model.Metadata{}, ok
 }
 
 func (f *State) SelectorForFlag(_ context.Context, flag model.Flag) string {
@@ -101,36 +193,85 @@ func (f *State) String() (string, error) {
 }
 
 // GetAll returns a copy of the store's state (copy in order to be concurrency safe)
-func (f *State) GetAll(_ context.Context) (map[string]model.Flag, model.Metadata, error) {
-	f.mx.RLock()
-	defer f.mx.RUnlock()
-	flags := make(map[string]model.Flag, len(f.Flags))
+func (f *State) GetAll(ctx context.Context, watcher chan Payload, selector string) (map[string]model.Flag, model.Metadata, error) {
+	txn := f.db.Txn(false)
+	var it memdb.ResultIterator
+	var err error
 
-	for key, flag := range f.Flags {
-		flags[key] = flag
+	if selector == "" {
+		it, err = txn.Get("flags", "flagSetId", selector)
+
+	} else {
+		it, err = txn.Get("flags", "flagSetId", selector)
+
+	}
+	if err != nil {
+		panic(err)
+	}
+
+	flags := make(map[string]model.Flag)
+	for obj := it.Next(); obj != nil; obj = it.Next() {
+		flag := obj.(model.Flag)
+		flags[flag.Key] = flag
+	}
+
+	f.logger.Debug("Get all...")
+
+	if watcher != nil {
+		changes := it.WatchCh()
+
+		go func() {
+			select {
+			case <-changes:
+				f.logger.Debug("flags store has changed, notifying watchers")
+				a, _, _ := f.GetAll(ctx, watcher, selector)
+				b, _ := json.Marshal(a)
+				watcher <- Payload{
+					Flags: string(b),
+				}
+				res := it.Next()
+				f.logger.Debug(fmt.Sprintf("%v", res))
+
+			}
+		}()
 	}
 
 	return flags, f.getMetadata(), nil
 }
 
+// func thing(it memdb.ResultIterator, watcher chan Payload) {
+// 	changes := it.WatchCh()
+
+// 	go func() {
+// 		//for {
+// 		select {
+// 		case <-changes:
+// 			//f.logger.Debug("flags store has changed, notifying watchers")
+// 			a, _ := f.queryAll()
+// 			b, _ := json.Marshal(a)
+// 			watcher <- Payload{
+// 				Flags: string(b),
+// 			}
+// 			res := it.Next()
+// 			f.logger.Debug(fmt.Sprintf("%v", res))
+
+// 		}
+// 		//}
+// 	}()
+// }
+
 // Add new flags from source.
 func (f *State) Add(logger *logger.Logger, source string, selector string, flags map[string]model.Flag,
 ) map[string]interface{} {
 	notifications := map[string]interface{}{}
+	txn := f.db.Txn(true)
 
 	for k, newFlag := range flags {
-		storedFlag, _, ok := f.Get(context.Background(), k)
-		if ok && !f.hasPriority(storedFlag.Source, source) {
-			logger.Debug(
-				fmt.Sprintf(
-					"not overwriting: flag %s from source %s does not have priority over %s",
-					k,
-					source,
-					storedFlag.Source,
-				),
-			)
-			continue
-		}
+		txn.Insert("flags", newFlag)
+
+		logger.Debug(
+			fmt.Sprintf("adding flag %s from source %s with selector %s", k, source, selector),
+		)
 
 		notifications[k] = map[string]interface{}{
 			"type":   string(model.NotificationCreate),
@@ -142,8 +283,19 @@ func (f *State) Add(logger *logger.Logger, source string, selector string, flags
 		newFlag.Selector = selector
 		f.Set(k, newFlag)
 	}
+	txn.Commit()
 
 	return notifications
+}
+
+func (f *State) delete(key string) {
+	txn := f.db.Txn(true)
+	defer txn.Abort()
+	txn.DeleteAll("flags", "keyOnly", key, false)
+
+	txn.DeleteAll("flags", "id", key, "2")
+	txn.Commit()
+
 }
 
 // Update the flag state with the provided flags.
@@ -159,11 +311,13 @@ func (f *State) Update(
 	f.mx.Lock()
 	f.setSourceMetadata(source, metadata)
 
-	for k, v := range f.Flags {
+	storedFlags, _, _ := f.GetAll(context.Background(), nil, "2")
+
+	for k, v := range storedFlags {
 		if v.Source == source && v.Selector == selector {
 			if _, ok := flags[k]; !ok {
 				// flag has been deleted
-				delete(f.Flags, k)
+				f.delete(k)
 				notifications[k] = map[string]interface{}{
 					"type":   string(model.NotificationDelete),
 					"source": source,
@@ -185,15 +339,15 @@ func (f *State) Update(
 		newFlag.Selector = selector
 		storedFlag, _, ok := f.Get(context.Background(), k)
 		if ok {
-			if !f.hasPriority(storedFlag.Source, source) {
-				logger.Debug(
-					fmt.Sprintf(
-						"not merging: flag %s from source %s does not have priority over %s",
-						k, source, storedFlag.Source,
-					),
-				)
-				continue
-			}
+			// if !f.hasPriority(storedFlag.Source, source) {
+			// 	logger.Debug(
+			// 		fmt.Sprintf(
+			// 			"not merging: flag %s from source %s does not have priority over %s",
+			// 			k, source, storedFlag.Source,
+			// 		),
+			// 	)
+			// 	continue
+			// }
 			if reflect.DeepEqual(storedFlag, newFlag) {
 				continue
 			}
